@@ -1,0 +1,8 @@
+prefix=/home/jd/catkin_ws/devel
+
+Name: ivr_assignment
+Description: Description of ivr_assignment
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/jd/catkin_ws/devel/lib 
+Requires: 
