@@ -46,8 +46,8 @@ class image_converter:
     self.green_proj_pos2 = self.detect_green(self.cv_image2)
     self.red_proj_pos2 = self.detect_red(self.cv_image2)
 
-    jas = self.detect_joint_angles()
-    print(jas)
+    a = self.estimate_3Dposition()
+    print(a)
     # im2=cv2.imshow('window2', self.cv_image2)
     # cv2.waitKey(1)
     # Publish the results
@@ -57,7 +57,18 @@ class image_converter:
       print(e)
 
   def estimate_3Dposition(self):
-    return null
+    a = self.pixel2meter()
+    yellow_circle3D_pos = np.array([0, 0, 0])
+    blue_circle3D_pos = np.array([0,0,2])
+    green_x = (self.green_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+    green_y = (self.green_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
+    green_z = (self.yellow_proj_pos1[1] - self.green_proj_pos1[1]) * a
+    green_circle3D_pos = np.array([green_x,green_y,green_z])
+    red_x = (self.red_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+    red_y = (self.red_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
+    red_z = (self.yellow_proj_pos1[1] - self.red_proj_pos1[1]) * a
+    red_circle3D_pos = np.array([red_x,red_y,red_z])
+    return np.array([yellow_circle3D_pos,blue_circle3D_pos,green_circle3D_pos,red_circle3D_pos])
 
   def pixel2meter(self):
     dist = np.sum((self.blue_proj_pos2 - self.yellow_proj_pos2)**2)
