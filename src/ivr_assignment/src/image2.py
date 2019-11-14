@@ -23,7 +23,15 @@ class image_converter:
     self.image_sub2 = rospy.Subscriber("/camera2/robot/image_raw",Image,self.callback2)
     # initialize the bridge between openCV and ROS
     self.bridge = CvBridge()
+    #subscribe the positions of circles from image1
+    self.circles1_p_sub = rospy.Subscriber("image1_circles_p",Float64MultiArray,self.callback1)
 
+  def callback1(self,data):
+    circles_pos1 = np.array(data.data)
+    self.yellow_proj_pos1 =  np.array([circles_pos1[0],circles_pos1[1]])
+    self.blue_proj_pos1 = np.array([circles_pos1[2],circles_pos1[3]])
+    self.green_proj_pos1 = np.array([circles_pos1[4],circles_pos1[5]])
+    self.red_proj_pos1 = np.array([circles_pos1[6],circles_pos1[7]])
 
   # Recieve data, process it, and publish
   def callback2(self,data):
@@ -32,16 +40,64 @@ class image_converter:
       self.cv_image2 = self.bridge.imgmsg_to_cv2(data, "bgr8")
     except CvBridgeError as e:
       print(e)
-    # Uncomment if you want to save the image
-    #cv2.imwrite('image_copy.png', cv_image)
-    im2=cv2.imshow('window2', self.cv_image2)
-    cv2.waitKey(1)
 
+    self.yellow_proj_pos2 = self.detect_yellow(self.cv_image2)
+    self.blue_proj_pos2 = self.detect_blue(self.cv_image2)
+    self.green_proj_pos2 = self.detect_green(self.cv_image2)
+    self.red_proj_pos2 = self.detect_red(self.cv_image2)
+
+    jas = self.detect_joint_angles()
+    print(jas)
+    # im2=cv2.imshow('window2', self.cv_image2)
+    # cv2.waitKey(1)
     # Publish the results
     try: 
       self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.cv_image2, "bgr8"))
     except CvBridgeError as e:
       print(e)
+
+  def estimate_3Dposition(self):
+    return null
+
+  def pixel2meter(self):
+    dist = np.sum((self.blue_proj_pos2 - self.yellow_proj_pos2)**2)
+    return 2/np.sqrt(dist)
+
+  def detect_green(self,image):
+    mask = cv2.inRange(image, (0, 100, 0), (0, 255, 0))
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.dilate(mask, kernel, iterations=3)
+    M = cv2.moments(mask)
+    cx = int(M['m10']/M['m00'])
+    cy = int(M['m01']/M['m00'])
+    return np.array([cx,cy])
+
+  def detect_red(self,image):
+    mask = cv2.inRange(image, (0, 0, 100), (0, 0, 255))
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.dilate(mask, kernel, iterations=3)
+    M = cv2.moments(mask)
+    cx = int(M['m10']/M['m00'])
+    cy = int(M['m01']/M['m00'])
+    return np.array([cx,cy])
+
+  def detect_blue(self,image):
+    mask = cv2.inRange(image, (100, 0, 0), (255, 0, 0))
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.dilate(mask, kernel, iterations=3)
+    M = cv2.moments(mask)
+    cx = int(M['m10']/M['m00'])
+    cy = int(M['m01']/M['m00'])
+    return np.array([cx,cy])
+
+  def detect_yellow(self,image):
+    mask = cv2.inRange(image, (0, 100, 100), (0, 255, 255))
+    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.dilate(mask, kernel, iterations=3)
+    M = cv2.moments(mask)
+    cx = int(M['m10']/M['m00'])
+    cy = int(M['m01']/M['m00'])
+    return np.array([cx,cy])
 
 # call the class
 def main(args):
