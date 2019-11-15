@@ -33,20 +33,25 @@ class image_converter:
       self.cv_image1 = self.bridge.imgmsg_to_cv2(data, "bgr8")
     except CvBridgeError as e:
       print(e)
-    
+
+    #position of target(orange sphere)
+    mask = self.detect_orange(self.cv_image1)
+    template = cv2.imread("image_crop.png", 0)
+    target_p = self.find_target(mask, template)
+
     self.circles_p = Float64MultiArray()
-    self.yellow_p = self.detect_yellow(self.cv_image1)
-    self.blue_p = self.detect_blue(self.cv_image1)
-    self.green_p = self.detect_green(self.cv_image1)
-    self.red_p = self.detect_red(self.cv_image1)
-    self.circles_p.data = np.array([self.yellow_p[0],self.yellow_p[1],self.blue_p[0],self.blue_p[1],self.green_p[0],self.green_p[1],self.red_p[0],self.red_p[1]])
+    yellow_p = self.detect_yellow(self.cv_image1)
+    blue_p = self.detect_blue(self.cv_image1)
+    green_p = self.detect_green(self.cv_image1)
+    red_p = self.detect_red(self.cv_image1)
+    self.circles_p.data = np.array([yellow_p[0],yellow_p[1],blue_p[0],blue_p[1],green_p[0],green_p[1],red_p[0],red_p[1],target_p[0],target_p[1]])
 
     # im1=cv2.imshow('window1', self.cv_image1)
     # cv2.waitKey(1)
     # Publish the results
     try:
       self.image1_circles_pub.publish(self.circles_p)
-      #self.image_pub1.publish(self.bridge.cv2_to_imgmsg(self.cv_image1, "bgr8"))
+      self.image_pub1.publish(self.bridge.cv2_to_imgmsg(self.cv_image1, "bgr8"))
     except CvBridgeError as e:
       print(e)
 
@@ -85,6 +90,15 @@ class image_converter:
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
+
+  def detect_orange(self, image):
+    mask = cv2.inRange(image, (50, 100, 110), (90, 185, 220))
+    return mask
+
+  def find_target(self, image, template):
+    res = cv2.matchTemplate(image, template, 0)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    return np.array([min_loc[0], min_loc[1]])
 
 # call the class
 def main(args):

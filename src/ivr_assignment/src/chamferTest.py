@@ -31,7 +31,7 @@ class image_converter:
     except CvBridgeError as e:
       print(e)
     
-    mask = self.detect_orange(self.cv_image2)
+    mask = self.detect_orange(self.cv_image1)
     template = cv2.imread("image_crop.png",0)
     self.find_target(mask,template)
     # Publish the results
@@ -42,13 +42,13 @@ class image_converter:
 
   def detect_orange(self,image):
     mask = cv2.inRange(image,(50,100,110),(90,185,220))
-    #cv2.imshow("w",mask)
-    #cv2.waitKey(1)
     return mask
     
-
   def find_target(self,image,template):
-    res =  cv2.matchTemplate(image,template,1)
+    res =  cv2.matchTemplate(image,template,0)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    print(min_loc)
+    return np.array([min_loc[0],min_loc[1]])
 # call the class
 def main(args):
   ic = image_converter()
