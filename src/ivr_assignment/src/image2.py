@@ -20,11 +20,12 @@ class image_converter:
     # initialize a publisher to send images from camera2 to a topic named image_topic2
     self.image_pub2 = rospy.Publisher("image_topic2",Image, queue_size = 1)
     # initialize a subscriber to recieve messages rom a topic named /robot/camera1/image_raw and use callback function to recieve data
+    self.circles1_p_sub = rospy.Subscriber("image1_circles_p", Float64MultiArray, self.callback1)
     self.image_sub2 = rospy.Subscriber("/camera2/robot/image_raw",Image,self.callback2)
     # initialize the bridge between openCV and ROS
     self.bridge = CvBridge()
     #subscribe the positions of circles from image1
-    self.circles1_p_sub = rospy.Subscriber("image1_circles_p",Float64MultiArray,self.callback1)
+
 
   def callback1(self,data):
     circles_pos1 = np.array(data.data)
@@ -32,6 +33,9 @@ class image_converter:
     self.blue_proj_pos1 = np.array([circles_pos1[2],circles_pos1[3]])
     self.green_proj_pos1 = np.array([circles_pos1[4],circles_pos1[5]])
     self.red_proj_pos1 = np.array([circles_pos1[6],circles_pos1[7]])
+
+    self.target_proj_pos1 = np.array([circles_pos1[8],circles_pos1[9]])
+
 
   # Recieve data, process it, and publish
   def callback2(self,data):
@@ -46,12 +50,15 @@ class image_converter:
     self.green_proj_pos2 = self.detect_green(self.cv_image2)
     self.red_proj_pos2 = self.detect_red(self.cv_image2)
 
-    a = self.estimate_3Dposition()
-    print(a)
+    self.circles_3D_position = self.estimate_3Dposition()
+
+    self.target_3Dposition = self.estimate_target_3Dposition()
+    print(self.target_3Dposition)
+
     # im2=cv2.imshow('window2', self.cv_image2)
     # cv2.waitKey(1)
     # Publish the results
-    try: 
+    try:
       self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.cv_image2, "bgr8"))
     except CvBridgeError as e:
       print(e)
@@ -71,7 +78,7 @@ class image_converter:
     return np.array([yellow_circle3D_pos,blue_circle3D_pos,green_circle3D_pos,red_circle3D_pos])
 
   def pixel2meter(self):
-    dist = np.sum((self.blue_proj_pos2 - self.yellow_proj_pos2)**2)
+    dist = np.sum((self.yellow_proj_pos2[1] - self.blue_proj_pos2[1])**2)
     return 2/np.sqrt(dist)
 
   def detect_green(self,image):
@@ -109,6 +116,25 @@ class image_converter:
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
+
+  def detect_orange(self,image):
+    mask = cv2.inRange(image,(50,100,110),(90,185,220))
+    return mask
+
+  def find_target(self,image,template):
+    res = cv2.matchTemplate(image,template,1)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    return np.array([min_loc[0],min_loc[1]])
+
+  def estimate_target_3Dposition(self):
+    a = self.pixel2meter()
+    orange_mask = self.detect_orange(self.cv_image2)
+    template = cv2.imread("image_crop.png", 0)
+    target_proj_pos2 = self.find_target(orange_mask, template)
+    target_x = (target_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+    target_y = (self.target_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
+    target_z = (self.yellow_proj_pos1[1] - self.target_proj_pos1[1]) * a
+    return np.array([target_x,target_y,target_z])
 
 # call the class
 def main(args):
