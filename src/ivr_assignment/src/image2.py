@@ -20,12 +20,11 @@ class image_converter:
     # initialize a publisher to send images from camera2 to a topic named image_topic2
     self.image_pub2 = rospy.Publisher("image_topic2",Image, queue_size = 1)
     # initialize a subscriber to recieve messages rom a topic named /robot/camera1/image_raw and use callback function to recieve data
-    self.circles1_p_sub = rospy.Subscriber("image1_circles_p", Float64MultiArray, self.callback1)
     self.image_sub2 = rospy.Subscriber("/camera2/robot/image_raw",Image,self.callback2)
     # initialize the bridge between openCV and ROS
     self.bridge = CvBridge()
     #subscribe the positions of circles from image1
-
+    self.circles1_p_sub = rospy.Subscriber("image1_circles_p",Float64MultiArray,self.callback1)
 
   def callback1(self,data):
     circles_pos1 = np.array(data.data)
@@ -53,8 +52,7 @@ class image_converter:
     self.circles_3D_position = self.estimate_3Dposition()
 
     self.target_3Dposition = self.estimate_target_3Dposition()
-    print(self.target_3Dposition)
-
+    print(self.circles_3D_position)
     # im2=cv2.imshow('window2', self.cv_image2)
     # cv2.waitKey(1)
     # Publish the results
