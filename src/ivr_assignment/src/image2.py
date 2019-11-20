@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 
+#!/usr/bin/env python
+
 import roslib
 import sys
 import rospy
 import cv2
 import numpy as np
+import math
+from scipy.optimize import least_squares
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from std_msgs.msg import Float64MultiArray, Float64
@@ -19,25 +23,27 @@ class image_converter:
     rospy.init_node('image_processing', anonymous=True)
     # initialize a publisher to send images from camera2 to a topic named image_topic2
     self.image_pub2 = rospy.Publisher("image_topic2",Image, queue_size = 1)
-    # initialize a subscriber to recieve messages rom a topic named /robot/camera1/image_raw and use callback function to recieve data
+    self.circles1_p_sub = rospy.Subscriber("/image1/circles_p", Float64MultiArray, self.callback1)
     self.image_sub2 = rospy.Subscriber("/camera2/robot/image_raw",Image,self.callback2)
     # initialize the bridge between openCV and ROS
     self.bridge = CvBridge()
-    #subscribe the positions of circles from image1
-    self.circles1_p_sub = rospy.Subscriber("image1_circles_p",Float64MultiArray,self.callback1)
+    #______control_part____#
+    self.beginning_time = rospy.get_time()
+    self.time_previous_step = np.array([rospy.get_time()],dtype = 'float64')
+    self.time_previous_step2 = np.array([rospy.get_time()],dtype = 'float64')
+    self.error = np.array([0.0, 0.0, 0.0], dtype = 'float64')
+    self.error_d = np.array([0.0, 0.0, 0.0], dtype = 'float64')
+    self.robot_joint1_pub = rospy.Publisher("/robot/joint1_position_controller/command", Float64, queue_size = 10)
+    self.robot_joint2_pub = rospy.Publisher("/robot/joint2_position_controller/command", Float64, queue_size = 10)
+    self.robot_joint3_pub = rospy.Publisher("/robot/joint3_position_controller/command", Float64, queue_size = 10)
+    self.robot_joint4_pub = rospy.Publisher("/robot/joint4_position_controller/command", Float64, queue_size = 10)
 
   def callback1(self,data):
     circles_pos1 = np.array(data.data)
     self.yellow_proj_pos1 =  np.array([circles_pos1[0],circles_pos1[1]])
     self.blue_proj_pos1 = np.array([circles_pos1[2],circles_pos1[3]])
-    if(circles_pos1[4] == -1):
-      self.green_proj_pos1 = np.array([0, circles_pos1[5]])
-    else:
-      self.green_proj_pos1 = np.array([circles_pos1[4],circles_pos1[5]])
-    if(circles_pos1[6] == -1):
-      self.red_proj_pos1 = np.array([self.green_proj_pos1[0],circles_pos1[7]])
-    else:
-      self.red_proj_pos1 = np.array([circles_pos1[6],circles_pos1[7]])
+    self.green_proj_pos1 = np.array([circles_pos1[4],circles_pos1[5]])
+    self.red_proj_pos1 = np.array([circles_pos1[6],circles_pos1[7]])
     self.target_proj_pos1 = np.array([circles_pos1[8],circles_pos1[9]])
 
 
@@ -56,6 +62,21 @@ class image_converter:
     self.circles_3D_position = self.estimate_3Dposition()
 
     self.target_3Dposition = self.estimate_target_3Dposition()
+
+    #______contol_part__________#
+    q_d = self.control_closed()
+    self.joint1 = Float64()
+    self.joint2 = Float64()
+    self.joint3 = Float64()
+    self.joint4 = Float64()
+    self.joint1.data = q_d[0]
+    self.joint2.data = q_d[1]
+    self.joint3.data = q_d[2]
+    self.joint4.data = q_d[3]
+    self.robot_joint1_pub.publish(self.joint1)
+    self.robot_joint2_pub.publish(self.joint2)
+    self.robot_joint3_pub.publish(self.joint3)
+    self.robot_joint4_pub.publish(self.joint4)
 
     try:
       self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.cv_image2, "bgr8"))
@@ -149,6 +170,51 @@ class image_converter:
     target_z = (self.yellow_proj_pos1[1] - self.target_proj_pos1[1]) * a
     return np.array([target_x,target_y,target_z])
 
+  def kinematic_matrix(self,q):
+    s1 = math.sin(q[0])
+    s2 = math.sin(q[1])
+    s3 = math.sin(q[2])
+    s4 = math.sin(q[3])
+    c1 = math.cos(q[0])
+    c2 = math.cos(q[1])
+    c3 = math.cos(q[2])
+    c4 = math.cos(q[3])
+    return np.array(
+      [2*s1*s2*c3*c4 + 2*c1*s3*c4 + 2*s1*c2*s4 + 3*s1*s2*c3 + 3*c1*s3 - self.circles_3D_position[3][0],
+      -2*c4*c1*s2*c3 + 2*c4*s1*s3 - 2*c1*c2*s4 - 3*c1*s2*c3 + 3*s1*s3 - self.circles_3D_position[3][1],
+      2*c4*c2*c3 - 2*s2*s4 + 3*c2*c3 + 2 - self.circles_3D_position[3][2]])
+
+  def jacobian_matrix(self,q):
+    s1 = math.sin(q[0])
+    s2 = math.sin(q[1])
+    s3 = math.sin(q[2])
+    s4 = math.sin(q[3])
+    c1 = math.cos(q[0])
+    c2 = math.cos(q[1])
+    c3 = math.cos(q[2])
+    c4 = math.cos(q[3])
+    return np.array([[2*c1*s2*c3*c4 - 2*s1*s3*c4 + 2*c1*c2*s4 + 3*c1*s2*c3 - 3*s1*s3, 2*s1*c2*c3*c4 - 2*s1*s2*s4 + 3*s1*c2*c3, -2*s1*s2*s3*c4 + 2*c1*c3*c4 - 3*s1*s2*s3 + 3*c1*c3, -2*s1*s2*c3*s4 - 2*c1*s3*s4 + 2*s1*c2*c4],
+      [2*s1*s2*c3*c4 + 2*c1*s3*c4 + 2*s1*c2*s4 + 3*s1*s2*c3 + 3*c1*s3, -2*c1*c2*c3*c4 + 2*c1*s2*s4 - 3*c1*c2*c3, 2*c1*s2*s3*c4 + 2*s1*c3*c4 + 3*c1*s2*s3 + 3*s1*c3, 2*c1*s2*c3*s4 - 2*s1*s3*s4 - 2*c1*c2*c4], [0, -2*s2*c3*c4 - 2*c2*s4 - 3*s2*c3, -2*c2*s3*c4 - 3*c2*s3, -2*c2*c3*s4 -2*s2*c4]])
+
+  def control_closed(self):
+    K_p = np.array([[10, 0, 0],[0, 10, 0],[0, 0, 10]]) #P gain
+    K_d = np.array([[0.1 ,0, 0],[0, 0.1, 0],[0, 0, 0.1]]) #D gain
+    cur_time = np.array([rospy.get_time()])
+    dt = cur_time - self.time_previous_step
+    self.time_previous_step = cur_time
+    pos = self.circles_3D_position[3]
+    pos_d = self.target_3Dposition
+    self.error_d = ((pos_d - pos) - self.error)/dt
+    self.error = pos_d - pos
+    res = least_squares(self.kinematic_matrix, (0, 0, 0, 0), self.jacobian_matrix,
+                        bounds=(-math.pi / 2, math.pi / 2))  # estimate initial value of joints
+    q = res.x # estimate initial value of joints
+    jacobian = self.jacobian_matrix(q)
+    J_inv = np.linalg.pinv(jacobian) #psudeo inverse of jacobian
+    dq_d = np.dot(J_inv, (np.dot(K_d,self.error_d.transpose()) + np.dot(K_p,self.error.transpose())))
+    q_d = q + (dt * dq_d)
+    return  q_d
+
 # call the class
 def main(args):
   ic = image_converter()
@@ -161,5 +227,7 @@ def main(args):
 # run the code if the node is called
 if __name__ == '__main__':
     main(sys.argv)
+
+
 
 
