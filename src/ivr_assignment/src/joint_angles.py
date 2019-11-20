@@ -29,9 +29,13 @@ class image_converter:
     except CvBridgeError as e:
       print(e)
 
-    green_position = np.array([0,0,5])
-    res = least_squares(self.fun_Kinematic,green_position,self.jacobian, bounds = ([-np.inf,-np.inf,-np.inf],np.inf))
+    self.green_position = np.array([0,3,2])
+    res = least_squares(self.fun_Kinematic, (0,0,0), self.jacobian, bounds = ([-math.pi,-math.pi/2,-math.pi/2], [math.pi, math.pi/2, math.pi/2]))
     print(res.x)
+    print(np.array(
+      [3*math.sin(res.x[0])*math.sin(res.x[1])*math.cos(res.x[2]) + 3*math.cos(res.x[0])*math.sin(res.x[2]),
+      -3*math.cos(res.x[0])*math.sin(res.x[1])*math.cos(res.x[2]) + 3*math.sin(res.x[0])*math.sin(res.x[2]),
+      3*math.cos(res.x[1])*math.cos(res.x[2]) + 2]))
     try: 
       self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.cv_image2, "bgr8"))
     except CvBridgeError as e:
@@ -39,13 +43,13 @@ class image_converter:
 
   def fun_Kinematic(self,q):
     return np.array(
-      [3*math.sin(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.cos(q[0])*math.sin(q[2]),
-      -3*math.cos(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.sin(q[0])*math.sin(q[2]),
-      3*math.cos(q[1])*math.cos(q[2]) + 2])
+      [3*math.sin(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.cos(q[0])*math.sin(q[2]) - self.green_position[0],
+      -3*math.cos(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.sin(q[0])*math.sin(q[2]) - self.green_position[1],
+      3*math.cos(q[1])*math.cos(q[2]) + 2 - self.green_position[2]])
 
   def jacobian(self,q):
-    return np.array([[3*math.cos(q[0])*math.sin(q[1])*math.cos(q[2]) - 3*math.sin(q[1])*math.cos(q[2]), 3*math.sin(q[0])*math.cos(q[1])*math.cos(q[2]), -3*math.sin(q[0])*math.sin(q[1])*math.sin(q[2]) + 3*math.cos(q[0])*math.cos(q[2])],
-                    [3*math.sin(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.cos(q[0])*math.cos(q[2]), -3*math.cos(q[0])*math.cos(q[1])*math.cos(q[2]), 3*math.cos(q[0])*math.sin(q[0])*math.sin(q[2]) + 3*math.sin(q[0])*math.cos(q[2])],
+    return np.array([[3*math.cos(q[0])*math.sin(q[1])*math.cos(q[2]) - 3*math.sin(q[0])*math.sin(q[2]), 3*math.sin(q[0])*math.cos(q[1])*math.cos(q[2]), -3*math.sin(q[0])*math.sin(q[1])*math.sin(q[2]) + 3*math.cos(q[0])*math.cos(q[2])],
+                    [3*math.sin(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.cos(q[0])*math.sin(q[2]), -3*math.cos(q[0])*math.cos(q[1])*math.cos(q[2]), 3*math.cos(q[0])*math.sin(q[1])*math.sin(q[2]) + 3*math.sin(q[0])*math.cos(q[2])],
                     [0, -3*math.sin(q[1])*math.cos(q[2]), -3*math.cos(q[1])*math.sin(q[2])]])
 
 # call the class
