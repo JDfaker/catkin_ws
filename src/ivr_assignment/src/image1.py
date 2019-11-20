@@ -60,6 +60,9 @@ class image_converter:
     kernel = np.ones((5,5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations = 3)
     M = cv2.moments(mask)
+    if (M['m00'] == 0):
+      print("Error: can not find the greed")
+      return np.array([-1, -1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
@@ -69,6 +72,9 @@ class image_converter:
     kernel = np.ones((5,5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations = 3)
     M = cv2.moments(mask)
+    if (M['m00'] == 0):
+      print("Error: can not find the red")
+      return np.array([-1, -1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
@@ -78,6 +84,9 @@ class image_converter:
     kernel = np.ones((5,5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations = 3)
     M = cv2.moments(mask)
+    if (M['m00'] == 0):
+      print("Error: can not find the blue")
+      return np.array([-1, -1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
@@ -87,6 +96,9 @@ class image_converter:
     kernel = np.ones((5,5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations = 3)
     M = cv2.moments(mask)
+    if (M['m00'] == 0):
+      print("Error: can not find the yellow")
+      return np.array([-1, -1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])

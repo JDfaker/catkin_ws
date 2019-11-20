@@ -29,28 +29,41 @@ class image_converter:
     except CvBridgeError as e:
       print(e)
 
-    self.green_position = np.array([0,3,2])
-    res = least_squares(self.fun_Kinematic, (0,0,0), self.jacobian, bounds = ([-math.pi,-math.pi/2,-math.pi/2], [math.pi, math.pi/2, math.pi/2]))
-    print(res.x)
-    print(np.array(
-      [3*math.sin(res.x[0])*math.sin(res.x[1])*math.cos(res.x[2]) + 3*math.cos(res.x[0])*math.sin(res.x[2]),
-      -3*math.cos(res.x[0])*math.sin(res.x[1])*math.cos(res.x[2]) + 3*math.sin(res.x[0])*math.sin(res.x[2]),
-      3*math.cos(res.x[1])*math.cos(res.x[2]) + 2]))
+    self.red_position = np.array([0,2,5])
+    res = least_squares(self.fun_Kinematic, (0,0,0,0), self.jacobian, bounds = (-math.pi/2, math.pi/2))
+    print 'angles: [%.4f, %.4f, %.4f, %.4f]' %(res.x[0], res.x[1], res.x[2], res.x[3])
+    err = self.fun_Kinematic(res.x)
+    print 'xyz error: [%.4f, %.4f, %.4f]' %(err[0], err[1], err[2])
     try: 
       self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.cv_image2, "bgr8"))
     except CvBridgeError as e:
       print(e)
 
   def fun_Kinematic(self,q):
+    s1 = math.sin(q[0])
+    s2 = math.sin(q[1])
+    s3 = math.sin(q[2])
+    s4 = math.sin(q[3])
+    c1 = math.cos(q[0])
+    c2 = math.cos(q[1])
+    c3 = math.cos(q[2])
+    c4 = math.cos(q[3])
     return np.array(
-      [3*math.sin(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.cos(q[0])*math.sin(q[2]) - self.green_position[0],
-      -3*math.cos(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.sin(q[0])*math.sin(q[2]) - self.green_position[1],
-      3*math.cos(q[1])*math.cos(q[2]) + 2 - self.green_position[2]])
+      [2*s1*s2*c3*c4 + 2*c1*s3*c4 + 2*s1*c2*s4 + 3*s1*s2*c3 + 3*c1*s3 - self.red_position[0],
+      -2*c4*c1*s2*c3 + 2*c4*s1*s3 - 2*c1*c2*s4 - 3*c1*s2*c3 + 3*s1*s3 - self.red_position[1],
+      2*c4*c2*c3 - 2*s2*s4 + 3*c2*c3 + 2 - self.red_position[2] ])
 
   def jacobian(self,q):
-    return np.array([[3*math.cos(q[0])*math.sin(q[1])*math.cos(q[2]) - 3*math.sin(q[0])*math.sin(q[2]), 3*math.sin(q[0])*math.cos(q[1])*math.cos(q[2]), -3*math.sin(q[0])*math.sin(q[1])*math.sin(q[2]) + 3*math.cos(q[0])*math.cos(q[2])],
-                    [3*math.sin(q[0])*math.sin(q[1])*math.cos(q[2]) + 3*math.cos(q[0])*math.sin(q[2]), -3*math.cos(q[0])*math.cos(q[1])*math.cos(q[2]), 3*math.cos(q[0])*math.sin(q[1])*math.sin(q[2]) + 3*math.sin(q[0])*math.cos(q[2])],
-                    [0, -3*math.sin(q[1])*math.cos(q[2]), -3*math.cos(q[1])*math.sin(q[2])]])
+    s1 = math.sin(q[0])
+    s2 = math.sin(q[1])
+    s3 = math.sin(q[2])
+    s4 = math.sin(q[3])
+    c1 = math.cos(q[0])
+    c2 = math.cos(q[1])
+    c3 = math.cos(q[2])
+    c4 = math.cos(q[3])
+    return np.array([[2*c1*s2*c3*c4 - 2*s1*s3*c4 + 2*c1*c2*s4 + 3*c1*s2*c3 - 3*s1*s3, 2*s1*c2*c3*c4 - 2*s1*s2*s4 + 3*s1*c2*c3, -2*s1*s2*s3*c4 + 2*c1*c3*c4 - 3*s1*s2*s3 + 3*c1*c3, -2*s1*s2*c3*s4 - 2*c1*s3*s4 + 2*s1*c2*c4],
+      [2*s1*s2*c3*c4 + 2*c1*s3*c4 + 2*s1*c2*s4 + 3*s1*s2*c3 + 3*c1*s3, -2*c1*c2*c3*c4 + 2*c1*s2*s4 - 3*c1*c2*c3, 2*c1*s2*s3*c4 + 2*s1*c3*c4 + 3*c1*s2*s3 + 3*s1*c3, 2*c1*s2*c3*s4 - 2*s1*s3*s4 - 2*c1*c2*c4], [0, -2*s2*c3*c4 - 2*c2*s4 - 3*s2*c3, -2*c2*s3*c4 - 3*c2*s3, -2*c2*c3*s4 -2*s2*c4]])
 
 # call the class
 def main(args):

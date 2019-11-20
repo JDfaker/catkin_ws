@@ -30,13 +30,17 @@ class image_converter:
     circles_pos1 = np.array(data.data)
     self.yellow_proj_pos1 =  np.array([circles_pos1[0],circles_pos1[1]])
     self.blue_proj_pos1 = np.array([circles_pos1[2],circles_pos1[3]])
-    self.green_proj_pos1 = np.array([circles_pos1[4],circles_pos1[5]])
-    self.red_proj_pos1 = np.array([circles_pos1[6],circles_pos1[7]])
-
+    if(circles_pos1[4] == -1):
+      self.green_proj_pos1 = np.array([0, circles_pos1[5]])
+    else:
+      self.green_proj_pos1 = np.array([circles_pos1[4],circles_pos1[5]])
+    if(circles_pos1[6] == -1):
+      self.red_proj_pos1 = np.array([self.green_proj_pos1[0],circles_pos1[7]])
+    else:
+      self.red_proj_pos1 = np.array([circles_pos1[6],circles_pos1[7]])
     self.target_proj_pos1 = np.array([circles_pos1[8],circles_pos1[9]])
 
 
-  # Recieve data, process it, and publish
   def callback2(self,data):
     # Recieve the image
     try:
@@ -52,15 +56,13 @@ class image_converter:
     self.circles_3D_position = self.estimate_3Dposition()
 
     self.target_3Dposition = self.estimate_target_3Dposition()
-    print(self.circles_3D_position)
-    # im2=cv2.imshow('window2', self.cv_image2)
-    # cv2.waitKey(1)
-    # Publish the results
+
     try:
       self.image_pub2.publish(self.bridge.cv2_to_imgmsg(self.cv_image2, "bgr8"))
     except CvBridgeError as e:
       print(e)
 
+  #estimate all circles 3D position
   def estimate_3Dposition(self):
     a = self.pixel2meter()
     yellow_circle3D_pos = np.array([0, 0, 0])
@@ -84,6 +86,9 @@ class image_converter:
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations=3)
     M = cv2.moments(mask)
+    if(M['m00'] == 0):
+      print("Error: can not find the greed")
+      return np.array([-1,-1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
@@ -93,6 +98,9 @@ class image_converter:
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations=3)
     M = cv2.moments(mask)
+    if (M['m00'] == 0):
+      print("Error: can not find the red")
+      return np.array([-1,-1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
@@ -102,6 +110,9 @@ class image_converter:
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations=3)
     M = cv2.moments(mask)
+    if (M['m00'] == 0):
+      print("Error: can not find the blue")
+      return np.array([-1, -1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
@@ -111,10 +122,14 @@ class image_converter:
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.dilate(mask, kernel, iterations=3)
     M = cv2.moments(mask)
+    if (M['m00'] == 0):
+      print("Error: can not find the yellow")
+      return np.array([-1, -1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
     return np.array([cx,cy])
 
+  #get a mask of box and the target
   def detect_orange(self,image):
     mask = cv2.inRange(image,(50,100,110),(90,185,220))
     return mask
