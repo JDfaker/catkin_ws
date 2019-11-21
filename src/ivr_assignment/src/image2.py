@@ -27,6 +27,8 @@ class image_converter:
     self.image_sub2 = rospy.Subscriber("/camera2/robot/image_raw",Image,self.callback2)
     # initialize the bridge between openCV and ROS
     self.bridge = CvBridge()
+    #____publish end effector position____#
+    self.end_effector_pub = rospy.Publisher("end_effector_position",Float64MultiArray,queue_size = 10)
     #______publish_target_position_____#
     self.target_3Dposition_pub = rospy.Publisher("/target/position_estimation",Float64MultiArray,queue_size = 10)
     #______control_part____#
@@ -60,6 +62,12 @@ class image_converter:
     self.green_proj_pos2 = self.detect_green(self.cv_image2)
     self.red_proj_pos2 = self.detect_red(self.cv_image2)
     self.circles_3D_position = self.estimate_3Dposition()
+
+    #____publish end effector position____#
+    self.end_effector_pos = Float64MultiArray()
+    self.end_effector_pos.data = self.circles_3D_position[3]
+    self.end_effector_pub.publish(self.end_effector_pos)
+
     #____target_part_____#
     self.target_3Dposition = self.estimate_target_3Dposition()
     self.target = Float64MultiArray()
@@ -194,15 +202,16 @@ class image_converter:
     target_z = (self.yellow_proj_pos1[1] - self.target_proj_pos1[1]) * a - 0.7
     return np.array([target_x,target_y,target_z])
 
+  #____kinematic matrix for estimation of j4______#
   def kinematic_matrix(self, q):
-    s1 = math.sin(q[0])
-    s2 = math.sin(q[1])
-    s3 = math.sin(q[2])
-    s4 = math.sin(q[3])
-    c1 = math.cos(q[0])
-    c2 = math.cos(q[1])
-    c3 = math.cos(q[2])
-    c4 = math.cos(q[3])
+    s1 = math.sin(self.j1)
+    s2 = math.sin(self.j2)
+    s3 = math.sin(self.j3)
+    s4 = math.sin(q[0])
+    c1 = math.cos(self.j1)
+    c2 = math.cos(self.j2)
+    c3 = math.cos(self.j3)
+    c4 = math.cos(q[0])
     a3 = 3.8571
     a4 = 2.4762
     return np.array(
@@ -234,6 +243,34 @@ class image_converter:
                      [0, -a4 * s2 * c3 * c4 - a4 * c2 * s4 - a3 * s2 * c3, -a4 * c2 * s3 * c4 - a3 * c2 * s3,
                       -a4 * c2 * c3 * s4 - a4 * s2 * c4]])
 
+  #_____kinematic matrix for joint 1 2 3 estimation
+  def kinematic03(self, q):
+    a3 = 3.8571
+    return np.array(
+      [a3 * math.sin(q[0]) * math.sin(q[1]) * math.cos(q[2]) + a3 * math.cos(q[0]) * math.sin(q[2]) - self.circles_3D_position[2][0],
+       -a3 * math.cos(q[0]) * math.sin(q[1]) * math.cos(q[2]) + a3 * math.sin(q[0]) * math.sin(q[2]) -self.circles_3D_position[2][1],
+       a3 * math.cos(q[1]) * math.cos(q[2]) + 2 - self.circles_3D_position[2][2]])
+
+  #______jacobian matrix for joint 1 2 3 estimation
+  def jacobian03(self, q):
+    a3 = 3.8571
+    return np.array([[a3 * math.cos(q[0]) * math.sin(q[1]) * math.cos(q[2]) - a3 * math.sin(q[0]) * math.sin(q[2]),
+                      a3 * math.sin(q[0]) * math.cos(q[1]) * math.cos(q[2]),
+                      -a3 * math.sin(q[0]) * math.sin(q[1]) * math.sin(q[2]) + a3 * math.cos(q[0]) * math.cos(q[2])],
+                     [a3 * math.sin(q[0]) * math.sin(q[1]) * math.cos(q[2]) + a3 * math.cos(q[0]) * math.sin(q[2]),
+                      -a3 * math.cos(q[0]) * math.cos(q[1]) * math.cos(q[2]),
+                      a3 * math.cos(q[0]) * math.sin(q[1]) * math.sin(q[2]) + a3 * math.sin(q[0]) * math.cos(q[2])],
+                     [0, -a3 * math.sin(q[1]) * math.cos(q[2]), -a3 * math.cos(q[1]) * math.sin(q[2])]])
+
+  def joint_angles_estimation(self):
+    res1 = least_squares(self.kinematic03,(0,0,0),self.jacobian03,bounds = (-math.pi / 2, math.pi / 2))
+    self.j1 = res1.x[0]
+    self.j2 = res1.x[1]
+    self.j3 = res1.x[2]
+    res2 = least_squares(self.kinematic_matrix,0,bounds = (-math.pi / 2, math.pi / 2))
+    self.j4 = res2.x[0]
+    return np.array([self.j1,self.j2,self.j3,self.j4])
+
   def control_closed(self):
     K_p = np.array([[10, 0, 0],[0, 10, 0],[0, 0, 10]]) #P gain
     K_d = np.array([[0.1 ,0, 0],[0, 0.1, 0],[0, 0, 0.1]]) #D gain
@@ -244,9 +281,8 @@ class image_converter:
     pos_d = self.target_3Dposition
     self.error_d = ((pos_d - pos) - self.error)/dt
     self.error = pos_d - pos
-    res = least_squares(self.kinematic_matrix, (0, 0, 0, 0), self.jacobian_matrix,
-                        bounds=(-math.pi / 2, math.pi / 2))  # estimate initial value of joints
-    q = res.x # estimate initial value of joints
+
+    q = self.joint_angles_estimation() # estimate initial value of joints
     jacobian = self.jacobian_matrix(q)
     J_inv = np.linalg.pinv(jacobian) #psudeo inverse of jacobian
     dq_d = np.dot(J_inv, (np.dot(K_d,self.error_d.transpose()) + np.dot(K_p,self.error.transpose())))
