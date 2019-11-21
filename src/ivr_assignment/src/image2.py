@@ -120,8 +120,8 @@ class image_converter:
     return np.array([yellow_circle3D_pos,blue_circle3D_pos,green_circle3D_pos,red_circle3D_pos])
 
   def pixel2meter(self):
-    dist = np.sum((self.yellow_proj_pos2[1] - self.blue_proj_pos2[1])**2)
-    return 2/np.sqrt(dist)
+    dist = self.yellow_proj_pos2[1] - self.blue_proj_pos2[1]
+    return 2/dist
 
   def detect_green(self,image):
     mask = cv2.inRange(image, (0, 100, 0), (0, 255, 0))
