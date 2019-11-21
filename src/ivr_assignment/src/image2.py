@@ -111,7 +111,7 @@ class image_converter:
       green_z = (self.yellow_proj_pos2[1] - self.green_proj_pos2[1]) * a
     if(self.green_proj_pos1[0] != -1 and self.green_proj_pos2[0] != -1):
       green_x = (self.green_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
-      green_y = (self.green_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+      green_y = (self.green_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
       green_z = (self.yellow_proj_pos2[1] - self.green_proj_pos2[1]) * a
     green_circle3D_pos = np.array([green_x,green_y,green_z])
 
