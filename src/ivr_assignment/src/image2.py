@@ -27,10 +27,11 @@ class image_converter:
     self.image_sub2 = rospy.Subscriber("/camera2/robot/image_raw",Image,self.callback2)
     # initialize the bridge between openCV and ROS
     self.bridge = CvBridge()
+    #______publish_target_position_____#
+    self.target_3Dposition_pub = rospy.Publisher("/target/position_estimation",Float64MultiArray,queue_size = 10)
     #______control_part____#
     self.beginning_time = rospy.get_time()
     self.time_previous_step = np.array([rospy.get_time()],dtype = 'float64')
-    self.time_previous_step2 = np.array([rospy.get_time()],dtype = 'float64')
     self.error = np.array([0.0, 0.0, 0.0], dtype = 'float64')
     self.error_d = np.array([0.0, 0.0, 0.0], dtype = 'float64')
     self.robot_joint1_pub = rospy.Publisher("/robot/joint1_position_controller/command", Float64, queue_size = 10)
@@ -58,10 +59,12 @@ class image_converter:
     self.blue_proj_pos2 = self.detect_blue(self.cv_image2)
     self.green_proj_pos2 = self.detect_green(self.cv_image2)
     self.red_proj_pos2 = self.detect_red(self.cv_image2)
-
     self.circles_3D_position = self.estimate_3Dposition()
-
+    #____target_part_____#
     self.target_3Dposition = self.estimate_target_3Dposition()
+    self.target = Float64MultiArray()
+    self.target.data = self.target_3Dposition
+    self.target_3Dposition_pub.publish(self.target)
 
     #______contol_part__________#
     q_d = self.control_closed()
@@ -112,7 +115,7 @@ class image_converter:
       red_x = (self.red_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
       red_y = green_y
       red_z = (self.yellow_proj_pos2[1] - self.red_proj_pos2[1]) * a
-    if(self.red_proj_pos1[0] != -1 and self.red_proj_pos2[2] != -1):
+    if(self.red_proj_pos1[0] != -1 and self.red_proj_pos2[0] != -1):
       red_x = (self.red_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
       red_y = (self.red_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
       red_z = (self.yellow_proj_pos2[1] - self.red_proj_pos2[1]) * a
@@ -121,7 +124,7 @@ class image_converter:
 
   def pixel2meter(self):
     dist = self.yellow_proj_pos2[1] - self.blue_proj_pos2[1]
-    return 2/dist
+    return 2.0/dist
 
   def detect_green(self,image):
     mask = cv2.inRange(image, (0, 100, 0), (0, 255, 0))
@@ -186,12 +189,12 @@ class image_converter:
     orange_mask = self.detect_orange(self.cv_image2)
     template = cv2.imread("image_crop.png", 0)
     target_proj_pos2 = self.find_target(orange_mask, template)
-    target_x = (target_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+    target_x = (target_proj_pos2[0] - self.yellow_proj_pos2[0]) * a - 1
     target_y = (self.target_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
-    target_z = (self.yellow_proj_pos1[1] - self.target_proj_pos1[1]) * a
+    target_z = (self.yellow_proj_pos1[1] - self.target_proj_pos1[1]) * a - 0.7
     return np.array([target_x,target_y,target_z])
 
-  def kinematic_matrix(self,q):
+  def fun_Kinematic(self, q):
     s1 = math.sin(q[0])
     s2 = math.sin(q[1])
     s3 = math.sin(q[2])
@@ -200,12 +203,16 @@ class image_converter:
     c2 = math.cos(q[1])
     c3 = math.cos(q[2])
     c4 = math.cos(q[3])
+    a3 = 3.8571
+    a4 = 2.4762
     return np.array(
-      [2*s1*s2*c3*c4 + 2*c1*s3*c4 + 2*s1*c2*s4 + 3*s1*s2*c3 + 3*c1*s3 - self.circles_3D_position[3][0],
-      -2*c4*c1*s2*c3 + 2*c4*s1*s3 - 2*c1*c2*s4 - 3*c1*s2*c3 + 3*s1*s3 - self.circles_3D_position[3][1],
-      2*c4*c2*c3 - 2*s2*s4 + 3*c2*c3 + 2 - self.circles_3D_position[3][2]])
+      [a4 * s1 * s2 * c3 * c4 + a4 * c1 * s3 * c4 + a4 * s1 * c2 * s4 + a3 * s1 * s2 * c3 + a3 * c1 * s3 -
+       self.red_position[0],
+       -a4 * c4 * c1 * s2 * c3 + a4 * c4 * s1 * s3 - a4 * c1 * c2 * s4 - a3 * c1 * s2 * c3 + a3 * s1 * s3 -
+       self.red_position[1],
+       a4 * c4 * c2 * c3 - a4 * s2 * s4 + a3 * c2 * c3 + 2 - self.red_position[2]])
 
-  def jacobian_matrix(self,q):
+  def jacobian(self, q):
     s1 = math.sin(q[0])
     s2 = math.sin(q[1])
     s3 = math.sin(q[2])
@@ -214,8 +221,18 @@ class image_converter:
     c2 = math.cos(q[1])
     c3 = math.cos(q[2])
     c4 = math.cos(q[3])
-    return np.array([[2*c1*s2*c3*c4 - 2*s1*s3*c4 + 2*c1*c2*s4 + 3*c1*s2*c3 - 3*s1*s3, 2*s1*c2*c3*c4 - 2*s1*s2*s4 + 3*s1*c2*c3, -2*s1*s2*s3*c4 + 2*c1*c3*c4 - 3*s1*s2*s3 + 3*c1*c3, -2*s1*s2*c3*s4 - 2*c1*s3*s4 + 2*s1*c2*c4],
-      [2*s1*s2*c3*c4 + 2*c1*s3*c4 + 2*s1*c2*s4 + 3*s1*s2*c3 + 3*c1*s3, -2*c1*c2*c3*c4 + 2*c1*s2*s4 - 3*c1*c2*c3, 2*c1*s2*s3*c4 + 2*s1*c3*c4 + 3*c1*s2*s3 + 3*s1*c3, 2*c1*s2*c3*s4 - 2*s1*s3*s4 - 2*c1*c2*c4], [0, -2*s2*c3*c4 - 2*c2*s4 - 3*s2*c3, -2*c2*s3*c4 - 3*c2*s3, -2*c2*c3*s4 -2*s2*c4]])
+    a3 = 3.8571
+    a4 = 2.4762
+    return np.array([[a4 * c1 * s2 * c3 * c4 - a4 * s1 * s3 * c4 + a4 * c1 * c2 * s4 + a3 * c1 * s2 * c3 - a3 * s1 * s3,
+                      a4 * s1 * c2 * c3 * c4 - a4 * s1 * s2 * s4 + a3 * s1 * c2 * c3,
+                      -a4 * s1 * s2 * s3 * c4 + a4 * c1 * c3 * c4 - a3 * s1 * s2 * s3 + a3 * c1 * c3,
+                      -a4 * s1 * s2 * c3 * s4 - a4 * c1 * s3 * s4 + a4 * s1 * c2 * c4],
+                     [a4 * s1 * s2 * c3 * c4 + a4 * c1 * s3 * c4 + a4 * s1 * c2 * s4 + a3 * s1 * s2 * c3 + a3 * c1 * s3,
+                      -a4 * c1 * c2 * c3 * c4 + a4 * c1 * s2 * s4 - a3 * c1 * c2 * c3,
+                      a4 * c1 * s2 * s3 * c4 + a4 * s1 * c3 * c4 + a3 * c1 * s2 * s3 + a3 * s1 * c3,
+                      a4 * c1 * s2 * c3 * s4 - a4 * s1 * s3 * s4 - a4 * c1 * c2 * c4],
+                     [0, -a4 * s2 * c3 * c4 - a4 * c2 * s4 - a3 * s2 * c3, -a4 * c2 * s3 * c4 - a3 * c2 * s3,
+                      -a4 * c2 * c3 * s4 - a4 * s2 * c4]])
 
   def control_closed(self):
     K_p = np.array([[10, 0, 0],[0, 10, 0],[0, 0, 10]]) #P gain
