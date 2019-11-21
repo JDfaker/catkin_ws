@@ -212,8 +212,8 @@ class image_converter:
     c2 = math.cos(self.j2)
     c3 = math.cos(self.j3)
     c4 = math.cos(q[0])
-    a3 = 3.8571
-    a4 = 2.4762
+    a3 = 3.5
+    a4 = 2.4
     return np.array(
       [a4 * s1 * s2 * c3 * c4 + a4 * c1 * s3 * c4 + a4 * s1 * c2 * s4 + a3 * s1 * s2 * c3 + a3 * c1 * s3 -
        self.circles_3D_position[3][0],
@@ -230,8 +230,8 @@ class image_converter:
     c2 = math.cos(q[1])
     c3 = math.cos(q[2])
     c4 = math.cos(q[3])
-    a3 = 3.8571
-    a4 = 2.4762
+    a3 = 3.5
+    a4 = 2.4
     return np.array([[a4 * c1 * s2 * c3 * c4 - a4 * s1 * s3 * c4 + a4 * c1 * c2 * s4 + a3 * c1 * s2 * c3 - a3 * s1 * s3,
                       a4 * s1 * c2 * c3 * c4 - a4 * s1 * s2 * s4 + a3 * s1 * c2 * c3,
                       -a4 * s1 * s2 * s3 * c4 + a4 * c1 * c3 * c4 - a3 * s1 * s2 * s3 + a3 * c1 * c3,
@@ -245,7 +245,7 @@ class image_converter:
 
   #_____kinematic matrix for joint 1 2 3 estimation
   def kinematic03(self, q):
-    a3 = 3.8571
+    a3 = 3.5
     return np.array(
       [a3 * math.sin(q[0]) * math.sin(q[1]) * math.cos(q[2]) + a3 * math.cos(q[0]) * math.sin(q[2]) - self.circles_3D_position[2][0],
        -a3 * math.cos(q[0]) * math.sin(q[1]) * math.cos(q[2]) + a3 * math.sin(q[0]) * math.sin(q[2]) -self.circles_3D_position[2][1],
@@ -253,7 +253,7 @@ class image_converter:
 
   #______jacobian matrix for joint 1 2 3 estimation
   def jacobian03(self, q):
-    a3 = 3.8571
+    a3 = 3.5
     return np.array([[a3 * math.cos(q[0]) * math.sin(q[1]) * math.cos(q[2]) - a3 * math.sin(q[0]) * math.sin(q[2]),
                       a3 * math.sin(q[0]) * math.cos(q[1]) * math.cos(q[2]),
                       -a3 * math.sin(q[0]) * math.sin(q[1]) * math.sin(q[2]) + a3 * math.cos(q[0]) * math.cos(q[2])],
