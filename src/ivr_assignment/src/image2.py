@@ -88,13 +88,34 @@ class image_converter:
     a = self.pixel2meter()
     yellow_circle3D_pos = np.array([0, 0, 0])
     blue_circle3D_pos = np.array([0,0,2])
-    green_x = (self.green_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
-    green_y = (self.green_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
-    green_z = (self.yellow_proj_pos1[1] - self.green_proj_pos1[1]) * a
+    #if there is no green in image2, assume x = 0, get z from image1
+    if(self.green_proj_pos2[0] == -1):
+      green_x = 0
+      green_y = (self.green_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
+      green_z = (self.yellow_proj_pos1[1] - self.green_proj_pos1[1]) * a
+    #if there is no green is image1, assume y = 0, get z from image2
+    if(self.green_proj_pos1[0] == -1) :
+      green_x = (self.green_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+      green_y = 0
+      green_z = (self.yellow_proj_pos2[1] - self.green_proj_pos2[1]) * a
+    if(self.green_proj_pos1[0] != -1 and self.green_proj_pos2[0] != -1):
+      green_x = (self.green_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+      green_y = (self.green_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+      green_z = (self.yellow_proj_pos2[1] - self.green_proj_pos2[1]) * a
     green_circle3D_pos = np.array([green_x,green_y,green_z])
-    red_x = (self.red_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
-    red_y = (self.red_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
-    red_z = (self.yellow_proj_pos1[1] - self.red_proj_pos1[1]) * a
+
+    if(self.red_proj_pos2[0] == -1):
+      red_x = green_x
+      red_y = (self.red_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
+      red_z = (self.yellow_proj_pos1[1] - self.red_proj_pos1[1]) * a
+    if(self.red_proj_pos1[0] == -1):
+      red_x = (self.red_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+      red_y = green_y
+      red_z = (self.yellow_proj_pos2[1] - self.red_proj_pos2[1]) * a
+    if(self.red_proj_pos1[0] != -1 and self.red_proj_pos2[2] != -1):
+      red_x = (self.red_proj_pos2[0] - self.yellow_proj_pos2[0]) * a
+      red_y = (self.red_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
+      red_z = (self.yellow_proj_pos2[1] - self.red_proj_pos2[1]) * a
     red_circle3D_pos = np.array([red_x,red_y,red_z])
     return np.array([yellow_circle3D_pos,blue_circle3D_pos,green_circle3D_pos,red_circle3D_pos])
 
