@@ -194,7 +194,7 @@ class image_converter:
     target_z = (self.yellow_proj_pos1[1] - self.target_proj_pos1[1]) * a - 0.7
     return np.array([target_x,target_y,target_z])
 
-  def fun_Kinematic(self, q):
+  def kinematic_matrix(self, q):
     s1 = math.sin(q[0])
     s2 = math.sin(q[1])
     s3 = math.sin(q[2])
@@ -207,12 +207,12 @@ class image_converter:
     a4 = 2.4762
     return np.array(
       [a4 * s1 * s2 * c3 * c4 + a4 * c1 * s3 * c4 + a4 * s1 * c2 * s4 + a3 * s1 * s2 * c3 + a3 * c1 * s3 -
-       self.red_position[0],
+       self.circles_3D_position[3][0],
        -a4 * c4 * c1 * s2 * c3 + a4 * c4 * s1 * s3 - a4 * c1 * c2 * s4 - a3 * c1 * s2 * c3 + a3 * s1 * s3 -
-       self.red_position[1],
-       a4 * c4 * c2 * c3 - a4 * s2 * s4 + a3 * c2 * c3 + 2 - self.red_position[2]])
+       self.circles_3D_position[3][1],
+       a4 * c4 * c2 * c3 - a4 * s2 * s4 + a3 * c2 * c3 + 2 - self.circles_3D_position[3][2]])
 
-  def jacobian(self, q):
+  def jacobian_matrix(self, q):
     s1 = math.sin(q[0])
     s2 = math.sin(q[1])
     s3 = math.sin(q[2])
