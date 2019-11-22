@@ -61,7 +61,7 @@ class image_converter:
     mask = cv2.dilate(mask, kernel, iterations = 3)
     M = cv2.moments(mask)
     if (M['m00'] == 0):
-      print("Error: can not find the greed")
+      print("Error: can not find the green")
       return np.array([-1, -1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])

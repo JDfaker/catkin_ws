@@ -19,6 +19,12 @@ class image_converter:
 
   # Defines publisher and subscriber
   def __init__(self):
+    #___initialize the projection position from camera1__
+    self.yellow_proj_pos1 = np.array([0,0])
+    self.blue_proj_pos1 = np.array([0,0])
+    self.green_proj_pos1 = np.array([0,0])
+    self.red_proj_pos1 = np.array([0,0])
+    self.target_proj_pos1 = np.array([0,0])
     # initialize the node named image_processing
     rospy.init_node('image_processing', anonymous=True)
     # initialize a publisher to send images from camera2 to a topic named image_topic2
@@ -140,7 +146,7 @@ class image_converter:
     mask = cv2.dilate(mask, kernel, iterations=3)
     M = cv2.moments(mask)
     if(M['m00'] == 0):
-      print("Error: can not find the greed")
+      print("Error: can not find the green")
       return np.array([-1,-1])
     cx = int(M['m10']/M['m00'])
     cy = int(M['m01']/M['m00'])
