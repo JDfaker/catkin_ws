@@ -197,9 +197,9 @@ class image_converter:
     orange_mask = self.detect_orange(self.cv_image2)
     template = cv2.imread("image_crop.png", 0)
     target_proj_pos2 = self.find_target(orange_mask, template)
-    target_x = (target_proj_pos2[0] - self.yellow_proj_pos2[0]) * a - 1
-    target_y = (self.target_proj_pos1[0] - self.yellow_proj_pos1[0]) * a
-    target_z = (self.yellow_proj_pos1[1] - self.target_proj_pos1[1]) * a - 0.7
+    target_x = (target_proj_pos2[0] - self.yellow_proj_pos2[0]) * a * 0.87 + 1
+    target_y = (self.target_proj_pos1[0] - self.yellow_proj_pos1[0]) * 0.67 + 0.7
+    target_z = (self.yellow_proj_pos1[1] - self.target_proj_pos1[1]) * a *0.645 + 0.95
     return np.array([target_x,target_y,target_z])
 
   #____kinematic matrix for estimation of j4______#
